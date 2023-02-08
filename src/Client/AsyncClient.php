@@ -35,6 +35,7 @@ class AsyncClient implements ClientInterface
         $this->logger = $options->getLogger();
         $this->state = ConnectionState::INIT->value;
         if ($proxyUrl = $this->options->getProxy()) {
+            $this->logger->debug('Using proxy: ' . $proxyUrl);
             $proxy = new ProxyConnector($proxyUrl);
         } else {
             $proxy = null;
