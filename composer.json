@@ -1,0 +1,22 @@
+{
+    "name": "alexmorbo/trassir-php",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Aleksandr Nikitin",
+            "email": "alex@morbo.ru"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "nesbot/carbon": "^2.66",
+        "react/http": "^1.8",
+        "clue/http-proxy-react": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "AlexMorbo\\Trassir\\": "src/"
+        }
+    }
+}
