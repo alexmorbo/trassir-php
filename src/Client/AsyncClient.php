@@ -7,6 +7,7 @@ use AlexMorbo\Trassir\Enum\ConnectionState;
 use AlexMorbo\Trassir\Enum\VideoContainer;
 use AlexMorbo\Trassir\TrassirException;
 use Clue\React\HttpProxy\ProxyConnector;
+use Psr\Log\LoggerInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
 use React\Http\Browser;
@@ -27,9 +28,11 @@ class AsyncClient implements ClientInterface
     private ?TimerInterface $healthTimer = null;
     private ?TimerInterface $settingsTimer = null;
     private ?TimerInterface $channelsTimer = null;
+    private LoggerInterface $logger;
 
     public function __construct(private ConnectionOptions $options)
     {
+        $this->logger = $options->getLogger();
         $this->state = ConnectionState::INIT->value;
         if ($proxyUrl = $this->options->getProxy()) {
             $proxy = new ProxyConnector($proxyUrl);
@@ -49,6 +52,10 @@ class AsyncClient implements ClientInterface
                 sprintf('https://%s:%d', $options->getHost(), $options->getHttpPort())
             )
             ->withTimeout(10.0);
+
+        $this->logger->debug(
+            'Client created, base url: ' . sprintf('https://%s:%d', $options->getHost(), $options->getHttpPort())
+        );
     }
 
     public function auth(): PromiseInterface
@@ -70,10 +77,15 @@ class AsyncClient implements ClientInterface
                 $data = json_decode($response->getBody()->getContents(), true);
 
                 if ($data['success'] !== 1) {
+                    $this->state = ConnectionState::AUTH_ERROR->value;
+                    $this->logger->error('Auth error: ' . $data['error']);
+
                     return reject(new TrassirException('Login failed', 400));
                 }
+
                 $this->sid = $data['sid'];
                 $this->state = ConnectionState::HAVE_SID->value;
+                $this->logger->debug('Auth success, sid: ' . $this->sid);
 
                 if (!$this->healthTimer) {
                     $this->healthTimer = Loop::addPeriodicTimer(120, function () {
@@ -106,8 +118,7 @@ class AsyncClient implements ClientInterface
                         return $this->fetchChannels();
                     });
                 }
-            })
-        ;
+            });
     }
 
     private function health()

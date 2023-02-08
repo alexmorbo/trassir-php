@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace AlexMorbo\Trassir;
 
 use AlexMorbo\Trassir\Dto\Server;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 class ConnectionOptions
 {
@@ -14,6 +16,7 @@ class ConnectionOptions
         private readonly int $rtspPort,
         private readonly string $login,
         private readonly string $password,
+        private LoggerInterface $logger,
         private readonly ?string $proxy = null,
     ) {
     }
@@ -25,7 +28,9 @@ class ConnectionOptions
             $server->getHttpPort(),
             $server->getRtspPort(),
             $server->getLogin(),
-            $server->getPassword()
+            $server->getPassword(),
+            $server->getLogger(),
+            $server->getProxy(),
         );
     }
 
@@ -36,7 +41,9 @@ class ConnectionOptions
             $server['http_port'],
             $server['rtsp_port'],
             $server['login'],
-            $server['password']
+            $server['password'],
+            $server['logger'] ?? new NullLogger(),
+            $server['proxy'] ?? null,
         );
     }
 
@@ -63,6 +70,11 @@ class ConnectionOptions
     public function getPassword(): string
     {
         return $this->password;
+    }
+
+    public function getLogger(): LoggerInterface
+    {
+        return $this->logger;
     }
 
     public function getProxy(): ?string

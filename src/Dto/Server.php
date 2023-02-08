@@ -2,14 +2,19 @@
 
 namespace AlexMorbo\Trassir\Dto;
 
-class Server
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+
+readonly class Server
 {
     public function __construct(
-        private readonly string $host,
-        private readonly int $httpPort,
-        private readonly int $rtspPort,
-        private readonly string $login,
-        private readonly string $password
+        private string $host,
+        private int $httpPort,
+        private int $rtspPort,
+        private string $login,
+        private string $password,
+        private LoggerInterface $logger,
+        private ?string $proxy = null,
     ) {
     }
 
@@ -20,7 +25,9 @@ class Server
             $server['httpPort'],
             $server['rtspPort'],
             $server['login'],
-            $server['password']
+            $server['password'],
+            $server['logger'] ?? new NullLogger(),
+            $server['proxy'] ?? null,
         );
     }
 
@@ -47,5 +54,15 @@ class Server
     public function getPassword(): string
     {
         return $this->password;
+    }
+
+    public function getLogger(): LoggerInterface
+    {
+        return $this->logger;
+    }
+
+    public function getProxy(): ?string
+    {
+        return $this->proxy;
     }
 }
