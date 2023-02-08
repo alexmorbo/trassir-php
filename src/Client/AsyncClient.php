@@ -99,7 +99,7 @@ class AsyncClient implements ClientInterface
 
                                     return $data;
                                 },
-                                fn() => dump('fail', func_get_args())
+                                fn() => var_dump('fail', func_get_args())
                             );
                     });
                 }
