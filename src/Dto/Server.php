@@ -8,6 +8,7 @@ use Psr\Log\NullLogger;
 readonly class Server
 {
     public function __construct(
+        private mixed $id,
         private string $host,
         private int $httpPort,
         private int $rtspPort,
@@ -21,6 +22,7 @@ readonly class Server
     public static function fromArray(array $server): self
     {
         return new self(
+            $server['id'] ?? uniqid('', true),
             $server['host'],
             $server['httpPort'],
             $server['rtspPort'],
@@ -29,6 +31,11 @@ readonly class Server
             $server['logger'] ?? new NullLogger(),
             $server['proxy'] ?? null,
         );
+    }
+
+    public function getId(): mixed
+    {
+        return $this->id;
     }
 
     public function getHost(): string

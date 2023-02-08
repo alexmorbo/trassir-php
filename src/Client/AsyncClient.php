@@ -7,6 +7,7 @@ use AlexMorbo\Trassir\Enum\ConnectionState;
 use AlexMorbo\Trassir\Enum\VideoContainer;
 use AlexMorbo\Trassir\TrassirException;
 use Clue\React\HttpProxy\ProxyConnector;
+use Exception;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
@@ -52,7 +53,7 @@ class AsyncClient implements ClientInterface
             ->withBase(
                 sprintf('https://%s:%d', $options->getHost(), $options->getHttpPort())
             )
-            ->withTimeout(10.0);
+            ->withTimeout(30.0);
 
         $this->logger->debug(
             'Client created, base url: ' . sprintf('https://%s:%d', $options->getHost(), $options->getHttpPort())
@@ -74,52 +75,69 @@ class AsyncClient implements ClientInterface
                     ]
                 )
             )
-            ->then(function (Response $response) {
-                $data = json_decode($response->getBody()->getContents(), true);
+            ->then(
+                function (Response $response) {
+                    $data = json_decode($response->getBody()->getContents(), true);
 
-                if ($data['success'] !== 1) {
-                    $this->state = ConnectionState::AUTH_ERROR->value;
-                    $this->logger->error('Auth error: ' . $data['error']);
+                    if ($data['success'] !== 1) {
+                        $this->state = ConnectionState::AUTH_ERROR->value;
+                        $this->logger->error('Auth error: ' . $data['error_code'] . ' - ' . $data['help']);
 
-                    return reject(new TrassirException('Login failed', 400));
+                        return reject(new TrassirException('Login failed', 400));
+                    }
+
+                    $this->sid = $data['sid'];
+                    $this->state = ConnectionState::HAVE_SID->value;
+                    $this->logger->debug('Auth success, sid: ' . $this->sid);
+
+                    if (!$this->healthTimer) {
+                        $this->healthTimer = Loop::addPeriodicTimer(120, function () {
+                            return $this->health()
+                                ->then(
+                                    function ($data) {
+                                        if (isset($data['error_code']) && $data['error_code'] === 'no session') {
+                                            return $this->auth();
+                                        }
+
+                                        return $data;
+                                    },
+                                    fn() => $this->logger->error('Health check failed', [func_get_args()])
+                                );
+                        });
+                    }
+
+                    return resolve($data['sid']);
+                },
+                function (Exception $e) {
+                    throw new TrassirException('Login failed: ' . $e->getMessage(), $e->getCode());
                 }
-
-                $this->sid = $data['sid'];
-                $this->state = ConnectionState::HAVE_SID->value;
-                $this->logger->debug('Auth success, sid: ' . $this->sid);
-
-                if (!$this->healthTimer) {
-                    $this->healthTimer = Loop::addPeriodicTimer(120, function () {
-                        return $this->health()
-                            ->then(
-                                function ($data) {
-                                    if (isset($data['error_code']) && $data['error_code'] === 'no session') {
-                                        return $this->auth();
-                                    }
-
-                                    return $data;
-                                },
-                                fn() => var_dump('fail', func_get_args())
-                            );
-                    });
+            )
+            ->then(
+                fn() => $this->fetchSettings(),
+            )
+            ->then(
+                fn() => $this->fetchChannels()
+            )
+            ->then(
+                function () {
+                    if (!$this->settingsTimer) {
+                        $this->settingsTimer = Loop::addPeriodicTimer(300, function () {
+                            return $this->fetchSettings();
+                        });
+                    }
+                    if (!$this->channelsTimer) {
+                        $this->channelsTimer = Loop::addPeriodicTimer(300, function () {
+                            return $this->fetchChannels();
+                        });
+                    }
                 }
-
-                return resolve($data['sid']);
-            })
-            ->then(fn() => $this->fetchSettings())
-            ->then(fn() => $this->fetchChannels())
-            ->then(function () {
-                if (!$this->settingsTimer) {
-                    $this->settingsTimer = Loop::addPeriodicTimer(300, function () {
-                        return $this->fetchSettings();
-                    });
+            )
+            ->otherwise(
+                function (Exception $e) {
+                    $this->logger->error('Auth failed: ' . $e->getMessage(), [func_get_args()]);
+                    throw $e;
                 }
-                if (!$this->channelsTimer) {
-                    $this->channelsTimer = Loop::addPeriodicTimer(300, function () {
-                        return $this->fetchChannels();
-                    });
-                }
-            });
+            );
     }
 
     private function health()
@@ -147,6 +165,11 @@ class AsyncClient implements ClientInterface
     public function getSettings(): array
     {
         return $this->settings;
+    }
+
+    public function getState(): int
+    {
+        return $this->state;
     }
 
     private function fetchSettings(): PromiseInterface

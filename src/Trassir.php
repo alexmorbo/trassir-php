@@ -17,16 +17,16 @@ class Trassir
      */
     public static function getInstance(ConnectionOptions $options, bool $async = true): self
     {
-        if (!isset(self::$instances[$options->getHost()])) {
-            self::$instances[$options->getHost()] = new self();
+        if (!isset(self::$instances[$options->getHash()])) {
+            self::$instances[$options->getHash()] = new self();
             if ($async) {
-                self::$instances[$options->getHost()]->connectAsync($options);
+                self::$instances[$options->getHash()]->connectAsync($options);
             } else {
                 throw new TrassirException('Sync client is not implemented yet');
             }
         }
 
-        return self::$instances[$options->getHost()];
+        return self::$instances[$options->getHash()];
     }
 
     public function connectAsync(ConnectionOptions $options): PromiseInterface
@@ -40,6 +40,11 @@ class Trassir
     public function getConnection(): PromiseInterface
     {
         return $this->connection;
+    }
+
+    public function getState(): int
+    {
+        return $this->client->getState();
     }
 
     public function getSettings(): array
