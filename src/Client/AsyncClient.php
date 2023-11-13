@@ -24,6 +24,7 @@ class AsyncClient implements ClientInterface
     private Browser $client;
     private int $state;
     private string $sid;
+    private string $host;
     private ?array $settings = [];
     private ?array $channels = [];
     private ?TimerInterface $healthTimer = null;
@@ -49,6 +50,7 @@ class AsyncClient implements ClientInterface
             ]
         ]);
 
+        $this->host = $this->options->getHost();
         $this->client = (new Browser($connector))
             ->withBase(
                 sprintf('https://%s:%d', $options->getHost(), $options->getHttpPort())
@@ -60,8 +62,9 @@ class AsyncClient implements ClientInterface
         );
     }
 
-    public function auth(): PromiseInterface
+    public function auth($attempt = 0): PromiseInterface
     {
+        $this->logger->debug('Start auth for ' . $this->host . ', attempt: ' . $attempt);
         return $this->client
             ->post(
                 '/login',
@@ -76,7 +79,7 @@ class AsyncClient implements ClientInterface
                 )
             )
             ->then(
-                function (Response $response) {
+                function (Response $response) use ($attempt) {
                     $data = json_decode($response->getBody()->getContents(), true);
 
                     if ($data['success'] !== 1) {
@@ -88,20 +91,24 @@ class AsyncClient implements ClientInterface
 
                     $this->sid = $data['sid'];
                     $this->state = ConnectionState::HAVE_SID->value;
-                    $this->logger->debug('Auth success, sid: ' . $this->sid);
+                    $this->logger->debug('Auth success for ' . $this->host . ', sid: ' . $this->sid);
 
                     if (!$this->healthTimer) {
-                        $this->healthTimer = Loop::addPeriodicTimer(120, function () {
+                        $this->healthTimer = Loop::addPeriodicTimer(20, function () use ($attempt) {
                             return $this->health()
                                 ->then(
                                     function ($data) {
                                         if (isset($data['error_code']) && $data['error_code'] === 'no session') {
-                                            return $this->auth();
+                                            return $this->auth(0);
                                         }
 
                                         return $data;
                                     },
-                                    fn() => $this->logger->error('Health check failed', [func_get_args()])
+                                    function () use ($attempt) {
+                                        $this->logger->error('Health check failed', [func_get_args()]);
+
+                                        return $this->auth($attempt + 1);
+                                    }
                                 );
                         });
                     }
@@ -132,8 +139,10 @@ class AsyncClient implements ClientInterface
                     }
                 }
             )
-            ->otherwise(
-                function (Exception $e) {
+            ->catch(
+                function (Exception $e) use ($attempt) {
+                    Loop::addTimer(10, fn() => $this->auth($attempt + 1));
+
                     $this->logger->error('Auth failed: ' . $e->getMessage(), [func_get_args()]);
                     throw $e;
                 }
