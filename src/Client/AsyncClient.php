@@ -116,7 +116,7 @@ class AsyncClient implements ClientInterface
                     return resolve($data['sid']);
                 },
                 function (Exception $e) {
-                    throw new TrassirException('Login failed: ' . $e->getMessage(), $e->getCode());
+                    return reject(new TrassirException('Login failed: ' . $e->getMessage(), $e->getCode()));
                 }
             )
             ->then(
@@ -142,9 +142,7 @@ class AsyncClient implements ClientInterface
             ->catch(
                 function (Exception $e) use ($attempt) {
                     Loop::addTimer(10, fn() => $this->auth($attempt + 1));
-
                     $this->logger->error('Auth failed: ' . $e->getMessage(), [func_get_args()]);
-                    throw $e;
                 }
             );
     }
