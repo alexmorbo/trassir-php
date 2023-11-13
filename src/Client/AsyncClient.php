@@ -147,7 +147,7 @@ class AsyncClient implements ClientInterface
             );
     }
 
-    private function health()
+    private function health(): PromiseInterface
     {
         if ($this->state < ConnectionState::HAVE_SID->value) {
             return reject(new TrassirException('Not authorized', 401));
