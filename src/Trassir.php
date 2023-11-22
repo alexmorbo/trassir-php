@@ -52,18 +52,18 @@ class Trassir
         return $this->client->getSettings();
     }
 
-    public function getChannels()
+    public function getChannels(): array
     {
         return $this->client->getChannels();
     }
 
-    public function getScreenshot(string $serverId, string $channelId)
+    public function getScreenshot(string $serverId, string $channelId): PromiseInterface
     {
         return $this->client->getScreenshot($serverId, $channelId);
     }
 
-    public function getVideo(string $serverId, string $channelId, string $container)
+    public function getVideo(string $serverId, string $channelId, string $container, string $stream): PromiseInterface
     {
-        return $this->client->getVideo($serverId, $channelId, $container);
+        return $this->client->getVideo($serverId, $channelId, $container, $stream);
     }
 }

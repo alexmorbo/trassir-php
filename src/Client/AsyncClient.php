@@ -284,7 +284,7 @@ class AsyncClient implements ClientInterface
             );
     }
 
-    public function getVideo(string $serverId, string $channelId, string $container): PromiseInterface
+    public function getVideo(string $serverId, string $channelId, string $container, string $stream): PromiseInterface
     {
         if ($this->state < ConnectionState::HAVE_SID->value) {
             return reject(new TrassirException('Not authorized', 401));
@@ -297,7 +297,7 @@ class AsyncClient implements ClientInterface
                     'sid' => $this->sid,
                     'server' => $serverId,
                     'channel' => $channelId,
-                    'stream' => 'main',
+                    'stream' => $stream,
                     'container' => $container,
                     'audio' => 'pcmu',
                 ]
