@@ -4,6 +4,7 @@ namespace AlexMorbo\Trassir;
 
 use AlexMorbo\Trassir\Client\AsyncClient;
 use AlexMorbo\Trassir\Client\ClientInterface;
+use Carbon\Carbon;
 use React\Promise\PromiseInterface;
 
 class Trassir
@@ -65,5 +66,10 @@ class Trassir
     public function getVideo(string $serverId, string $channelId, string $container, string $stream): PromiseInterface
     {
         return $this->client->getVideo($serverId, $channelId, $container, $stream);
+    }
+
+    public function downloadArchiveVideo(string $channelId, Carbon $start, Carbon $end): PromiseInterface
+    {
+        return $this->client->downloadArchiveVideo($channelId, $start, $end);
     }
 }

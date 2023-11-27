@@ -6,6 +6,7 @@ use AlexMorbo\Trassir\ConnectionOptions;
 use AlexMorbo\Trassir\Enum\ConnectionState;
 use AlexMorbo\Trassir\Enum\VideoContainer;
 use AlexMorbo\Trassir\TrassirException;
+use Carbon\Carbon;
 use Clue\React\HttpProxy\ProxyConnector;
 use Exception;
 use Psr\Log\LoggerInterface;
@@ -14,10 +15,12 @@ use React\EventLoop\TimerInterface;
 use React\Http\Browser;
 use React\Promise\PromiseInterface;
 use React\Socket\Connector;
+use React\Stream\ReadableStreamInterface;
 use RingCentral\Psr7\Response;
 
 use function React\Promise\reject;
 use function React\Promise\resolve;
+use function React\Promise\Stream\all;
 
 class AsyncClient implements ClientInterface
 {
@@ -326,5 +329,61 @@ class AsyncClient implements ClientInterface
                     };
                 },
             );
+    }
+
+    public function downloadArchiveVideo(string $channelId, Carbon $start, Carbon $end): PromiseInterface
+    {
+        return $this
+            ->requestArchiveTask($channelId, $start, $end)
+            ->then(fn(string $taskId) => $this->exportArchiveTask($taskId))
+            ->then(function(ReadableStreamInterface $stream) {
+                return all($stream)->then(function (array $chunks) {
+                    return implode('', $chunks);
+                });
+            });
+    }
+
+    private function requestArchiveTask(string $channelId, Carbon $start, Carbon $end): PromiseInterface
+    {
+        if ($this->state < ConnectionState::HAVE_SID->value) {
+            return reject(new TrassirException('Not authorized', 401));
+        }
+
+        $body = [
+            'resource_guid' => $channelId,
+            'start_ts' => $start->getTimestamp() * 1000000,
+            'end_ts' => $end->getTimestamp() * 1000000,
+            'is_hardware' => 0,
+            'prefer_substream' => 0,
+        ];
+
+        return $this->client->post(
+            sprintf("/jit-export-create-task?sid=%s", $this->sid),
+            [
+                'Content-Type' => 'application/json'
+            ],
+            json_encode($body)
+        )
+            ->then(
+                function (Response $response) {
+                    $data = json_decode($response->getBody()->getContents(), true);
+                    if (! $data['success']) {
+                        throw new TrassirException($data['error_code']);
+                    }
+
+                    return $data['task_id'];
+                },
+            );
+    }
+
+    private function exportArchiveTask(string $taskId): PromiseInterface
+    {
+        if ($this->state < ConnectionState::HAVE_SID->value) {
+            return reject(throw new TrassirException('Not authorized', 401));
+        }
+
+        return $this->client
+            ->requestStreaming('GET', sprintf("/jit-export-download?sid=%s&task_id=%s", $this->sid, $taskId))
+            ->then(fn(Response $response) => $response->getBody());
     }
 }

@@ -13,7 +13,8 @@
         "nesbot/carbon": "^2.66",
         "react/http": "^1.8",
         "clue/http-proxy-react": "^1.8",
-        "monolog/monolog": "^3.3"
+        "monolog/monolog": "^3.3",
+        "react/promise-stream": "^1.6"
     },
     "autoload": {
         "psr-4": {
